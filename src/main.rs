@@ -9,8 +9,8 @@ use rocket::State;
 mod config;
 
 #[get("/")]
-fn index(state: State<config::Gallery>) -> String {
-    format!("Hello, world!: {:?}", state)
+fn index(gallery: State<config::Gallery>) -> String {
+    format!("Hello, world!: {:?}", gallery)
 }
 
 fn main() -> Result<()> {
@@ -18,7 +18,7 @@ fn main() -> Result<()> {
         config::parse_config_path_from_args_or_die().context("failed to open the config file")?;
     let gallery_cfg = config::load_config(&config_filepath).context("failed to parse config")?;
 
-    let gallery = config::Gallery::new(&gallery_cfg)?;
+    let gallery = config::Gallery::new(&gallery_cfg).context("could not scan image directories")?;
 
     rocket::ignite()
         .mount("/", routes![index])

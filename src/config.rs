@@ -2,7 +2,7 @@ use std::env;
 use std::fs::{read_dir, DirEntry, File, ReadDir};
 use std::path::PathBuf;
 
-use anyhow::{Error, Result};
+use anyhow::{Context, Error, Result};
 use serde::Deserialize;
 
 pub fn load_config(config_path: &str) -> Result<GalleryConfig> {
@@ -34,7 +34,9 @@ impl Gallery {
     pub fn new(cfg: &GalleryConfig) -> Result<Gallery> {
         let mut dir_iters: Vec<ReadDir> = Vec::new();
         for dir in &cfg.dirs {
-            let dir_iter = read_dir(dir.as_path())?;
+            let path = dir.as_path().display().to_string();
+            let context_msg = format!("failed to open directory '{}'", &path);
+            let dir_iter = read_dir(&path).context(context_msg)?;
             dir_iters.push(dir_iter);
         }
 
