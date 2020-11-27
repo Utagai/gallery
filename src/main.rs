@@ -5,12 +5,14 @@ extern crate rocket;
 
 use anyhow::{Context, Result};
 use rocket::State;
+use rocket_contrib::templates::Template;
 
 mod config;
 
 #[get("/")]
-fn index(gallery: State<config::Gallery>) -> String {
-    format!("Hello, world!: {:?}", gallery)
+fn index(gallery: State<config::Gallery>) -> Template {
+    Template::render("index", gallery.inner())
+    // format!("Hello, world!: {:?}", gallery)
 }
 
 fn main() -> Result<()> {
@@ -22,6 +24,7 @@ fn main() -> Result<()> {
 
     rocket::ignite()
         .mount("/", routes![index])
+        .attach(Template::fairing())
         .manage(gallery)
         .launch();
 

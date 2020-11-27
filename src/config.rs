@@ -3,7 +3,7 @@ use std::fs::{read_dir, DirEntry, File, ReadDir};
 use std::path::PathBuf;
 
 use anyhow::{Context, Error, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 pub fn load_config(config_path: &str) -> Result<GalleryConfig> {
     let config_file = File::open(config_path)?;
@@ -25,7 +25,7 @@ pub struct GalleryConfig {
     dirs: Vec<PathBuf>,
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Debug)]
 pub struct Gallery {
     pub dir_entries: Vec<PathBuf>,
 }
