@@ -34,19 +34,10 @@ pub struct Image {
 
 impl Image {
     fn new(path: PathBuf) -> Result<Image> {
-        // TODO: I think we are doing 3 passes here to get to a base64 string:
-        // Read pass
-        // Write pass (happens in lockstep with above, I assume, due to io::copy)
-        // Byte -> String pass
-        // I think we can get away with two:
-        // Read pass (into bytes)
-        // base64::encode() (I assume only does one pass)
-        let mut image_file = File::open(&path)?;
-        let mut enc = base64::write::EncoderWriter::new(Vec::new(), base64::STANDARD);
-        std::io::copy(&mut image_file, &mut enc)?;
+        let image_bytes = std::fs::read(&path)?;
         Ok(Image {
             path,
-            bytes: str::from_utf8(&enc.finish()?)?.to_string(),
+            bytes: base64::encode(image_bytes),
         })
     }
 }
