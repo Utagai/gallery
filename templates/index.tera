@@ -6,10 +6,17 @@
   <body>
     <p>
       This is an example paragraph. Anything in the <strong>body</strong> tag will appear on the
-      page, just like this <strong>p</strong> tag and its contents.</p>
+      page, just like this <strong>p</strong> tag and its contents.
+    </p>
     <ul>
-    {% for path in paths %}
-      <li><a href="{{ path }}">{{ path }}</a></li>
+    {% for image in images %}
+      <li>
+        <!-- For some reason, image/jpeg works for PNGs too. Haven't tested it
+        with other image types because I personally don't need them to work but
+        it's worth keeping this comment here just in case... -->
+        <img src="data:image/jpeg;base64, {{ image.bytes }}"/>
+        <a href="{{ image.path }}">{{ image.path }}</a>
+      </li>
     {% endfor %}
     </ul>
   </body>

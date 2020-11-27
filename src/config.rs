@@ -1,6 +1,7 @@
 use std::env;
 use std::fs::{read_dir, DirEntry, File, ReadDir};
 use std::path::PathBuf;
+use std::str;
 
 use anyhow::{Context, Error, Result};
 use serde::{Deserialize, Serialize};
@@ -26,13 +27,38 @@ pub struct GalleryConfig {
 }
 
 #[derive(Serialize, Debug)]
+pub struct Image {
+    path: PathBuf,
+    bytes: String,
+}
+
+impl Image {
+    fn new(path: PathBuf) -> Result<Image> {
+        // TODO: I think we are doing 3 passes here to get to a base64 string:
+        // Read pass
+        // Write pass (happens in lockstep with above, I assume, due to io::copy)
+        // Byte -> String pass
+        // I think we can get away with two:
+        // Read pass (into bytes)
+        // base64::encode() (I assume only does one pass)
+        let mut image_file = File::open(&path)?;
+        let mut enc = base64::write::EncoderWriter::new(Vec::new(), base64::STANDARD);
+        std::io::copy(&mut image_file, &mut enc)?;
+        Ok(Image {
+            path,
+            bytes: str::from_utf8(&enc.finish()?)?.to_string(),
+        })
+    }
+}
+
+#[derive(Serialize, Debug)]
 pub struct Gallery {
-    pub paths: Vec<PathBuf>,
+    pub images: Vec<Image>,
 }
 
 impl Gallery {
     pub fn new(cfg: &GalleryConfig) -> Result<Gallery> {
-        let mut dir_iters: Vec<ReadDir> = Vec::new();
+        let mut dir_iters: Vec<ReadDir> = Vec::with_capacity(cfg.dirs.len());
         for dir in &cfg.dirs {
             let path = dir.as_path().display().to_string();
             let context_msg = format!("failed to open directory '{}'", &path);
@@ -45,8 +71,12 @@ impl Gallery {
             .flatten()
             .collect::<Result<Vec<DirEntry>, std::io::Error>>()?;
 
-        Ok(Gallery {
-            paths: results.iter().map(|x| x.path()).collect(),
-        })
+        let paths = results.iter().map(|x| x.path()).collect::<Vec<PathBuf>>();
+        let mut images: Vec<Image> = Vec::with_capacity(paths.len());
+        for path in paths {
+            images.push(Image::new(path)?)
+        }
+
+        Ok(Gallery { images })
     }
 }
