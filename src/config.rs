@@ -25,13 +25,13 @@ pub struct GalleryConfig {
     dirs: Vec<PathBuf>,
 }
 
-pub struct Gallery<'a> {
-    cfg: &'a GalleryConfig,
-    dir_entries: Vec<PathBuf>,
+#[derive(Debug)]
+pub struct Gallery {
+    pub dir_entries: Vec<PathBuf>,
 }
 
-impl<'a> Gallery<'a> {
-    fn new(cfg: &'a GalleryConfig) -> Result<Gallery> {
+impl Gallery {
+    pub fn new(cfg: &GalleryConfig) -> Result<Gallery> {
         let mut dir_iters: Vec<ReadDir> = Vec::new();
         for dir in &cfg.dirs {
             let dir_iter = read_dir(dir.as_path())?;
@@ -44,7 +44,6 @@ impl<'a> Gallery<'a> {
             .collect::<Result<Vec<DirEntry>, std::io::Error>>()?;
 
         Ok(Gallery {
-            cfg,
             dir_entries: results.iter().map(|x| x.path()).collect(),
         })
     }

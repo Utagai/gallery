@@ -4,21 +4,26 @@
 extern crate rocket;
 
 use anyhow::{Context, Result};
+use rocket::State;
 
 mod config;
 
 #[get("/")]
-fn index() -> &'static str {
-    "Hello, world!"
+fn index(state: State<config::Gallery>) -> String {
+    format!("Hello, world!: {:?}", state)
 }
 
 fn main() -> Result<()> {
     let config_filepath =
         config::parse_config_path_from_args_or_die().context("failed to open the config file")?;
     let gallery_cfg = config::load_config(&config_filepath).context("failed to parse config")?;
-    println!("gallery cfg: {:?}", gallery_cfg);
 
-    rocket::ignite().mount("/", routes![index]).launch();
+    let gallery = config::Gallery::new(&gallery_cfg)?;
+
+    rocket::ignite()
+        .mount("/", routes![index])
+        .manage(gallery)
+        .launch();
 
     Ok(())
 }
