@@ -27,7 +27,7 @@ pub struct GalleryConfig {
 
 #[derive(Serialize, Debug)]
 pub struct Gallery {
-    pub dir_entries: Vec<PathBuf>,
+    pub paths: Vec<PathBuf>,
 }
 
 impl Gallery {
@@ -46,7 +46,7 @@ impl Gallery {
             .collect::<Result<Vec<DirEntry>, std::io::Error>>()?;
 
         Ok(Gallery {
-            dir_entries: results.iter().map(|x| x.path()).collect(),
+            paths: results.iter().map(|x| x.path()).collect(),
         })
     }
 }
