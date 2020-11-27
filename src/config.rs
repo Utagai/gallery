@@ -1,6 +1,6 @@
 use std::env;
 use std::fs::{read_dir, DirEntry, File, ReadDir};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str;
 
 use anyhow::{Context, Error, Result};
@@ -71,5 +71,9 @@ impl Gallery {
         }
 
         Ok(Gallery { images })
+    }
+
+    pub fn has(&self, path: &Path) -> bool {
+        self.images.iter().any(|i| i.path == path)
     }
 }

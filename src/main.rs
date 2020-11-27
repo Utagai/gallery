@@ -1,13 +1,56 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 
+use std::path::Path;
+
 #[macro_use]
 extern crate rocket;
 
-use anyhow::{Context, Result};
-use rocket::State;
+use anyhow::{Context, Error, Result};
+use rocket::http::Status;
+use rocket::response::{self, status::Custom, NamedFile, Responder};
+use rocket::{Request, State};
 use rocket_contrib::templates::Template;
 
 mod config;
+
+struct GetImgResponder {
+    res: Result<NamedFile>,
+}
+
+impl GetImgResponder {
+    fn ok(res: NamedFile) -> GetImgResponder {
+        GetImgResponder { res: Ok(res) }
+    }
+
+    fn err(err: Error) -> GetImgResponder {
+        GetImgResponder { res: Err(err) }
+    }
+}
+
+impl<'r> Responder<'r> for GetImgResponder {
+    fn respond_to(self, req: &Request) -> response::Result<'r> {
+        match self.res {
+            Ok(named_file) => named_file.respond_to(req),
+            Err(err) => {
+                let resp = Custom(Status::BadRequest, format!("{}", err));
+                resp.respond_to(req)
+            }
+        }
+    }
+}
+
+#[get("/img?<path>")]
+fn get_img(gallery: State<config::Gallery>, path: String) -> GetImgResponder {
+    let p = Path::new(&path);
+    if !gallery.has(p) {
+        return GetImgResponder::err(Error::msg(format!("'{}' is not in the gallery", path)));
+    }
+
+    match NamedFile::open(p) {
+        Ok(named_file) => GetImgResponder::ok(named_file),
+        Err(err) => GetImgResponder::err(Error::new(err)),
+    }
+}
 
 #[get("/")]
 fn index(gallery: State<config::Gallery>) -> Template {
@@ -34,7 +77,7 @@ fn main() -> Result<()> {
     let gallery = config::Gallery::new(&gallery_cfg).context("could not scan image directories")?;
 
     rocket::ignite()
-        .mount("/", routes![index])
+        .mount("/", routes![index, get_img])
         .attach(Template::fairing())
         .manage(gallery)
         .launch();
