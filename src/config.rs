@@ -35,6 +35,7 @@ pub struct Image {
 impl Image {
     fn new(path: PathBuf) -> Result<Image> {
         let image_bytes = std::fs::read(&path)?;
+
         Ok(Image {
             path,
             bytes: base64::encode(image_bytes),
@@ -64,6 +65,7 @@ impl Gallery {
 
         let paths = results.iter().map(|x| x.path()).collect::<Vec<PathBuf>>();
         let mut images: Vec<Image> = Vec::with_capacity(paths.len());
+        // TODO: We should be able to parallelize this if need be.
         for path in paths {
             images.push(Image::new(path)?)
         }
