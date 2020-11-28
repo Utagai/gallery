@@ -1,24 +1,23 @@
+use std::collections::HashMap;
 use std::fs::{read_dir, DirEntry, ReadDir};
 use std::path::{Path, PathBuf};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc,
+    Arc, Mutex,
 };
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
 
 use anyhow::{Context, Result};
+use inotify::{EventMask, Inotify, WatchMask};
 use serde::Serialize;
 
 use crate::config;
 
-#[derive(Serialize, Debug)]
+#[derive(Debug)]
 pub struct Gallery {
-    pub paths: Vec<PathBuf>,
-    #[serde(skip_serializing)]
+    pub paths: Arc<Mutex<Vec<PathBuf>>>,
     stop: Arc<AtomicBool>,
-    #[serde(skip_serializing)]
-    inotify_thread: Option<JoinHandle<()>>,
+    inotify_thread: Option<JoinHandle<Result<()>>>,
 }
 
 impl Gallery {
@@ -36,15 +35,50 @@ impl Gallery {
             .flatten()
             .collect::<Result<Vec<DirEntry>, std::io::Error>>()?;
 
-        let paths = results.iter().map(|x| x.path()).collect::<Vec<PathBuf>>();
+        let path_vec = results.iter().map(|x| x.path()).collect::<Vec<PathBuf>>();
 
         let stop = Arc::new(AtomicBool::new(false));
         let stop_clone = stop.clone();
-        let inotify_thread = Some(thread::spawn(move || {
-            while !stop_clone.load(Ordering::Relaxed) {
-                println!("Hello world!");
-                thread::sleep(Duration::from_millis(1000));
+        let dirs_clone = cfg.dirs.to_vec();
+        let paths = Arc::new(Mutex::new(path_vec));
+        let paths_clone = paths.clone();
+        let inotify_thread = Some(thread::spawn(move || -> Result<()> {
+            // This is a serious enough problem that I'd rather panic.
+            let mut inotify = Inotify::init().expect("failed to initialize inotify");
+
+            let mut watches = HashMap::new();
+            for dir in dirs_clone {
+                let watch =
+                    inotify.add_watch(dir.as_path(), WatchMask::CREATE | WatchMask::DELETE)?;
+                watches.insert(watch, dir.clone());
             }
+
+            let mut buffer = [0u8; 4096];
+            while !stop_clone.load(Ordering::Relaxed) {
+                let events = inotify.read_events_blocking(&mut buffer)?;
+                let mut mut_paths_clone = paths_clone.lock().unwrap();
+                for event in events {
+                    let file_name = match event.name {
+                        Some(name) => name,
+                        // This should likely never happen, as this is only true if the affected
+                        // file is the watched directory/file itself. In either case, it calls for
+                        // a skip.
+                        None => continue,
+                    };
+                    let path = PathBuf::from(file_name);
+                    let dir = &watches[&event.wd];
+                    let mut dirpath = PathBuf::from(dir);
+                    dirpath.push(path);
+
+                    if event.mask.contains(EventMask::CREATE) {
+                        mut_paths_clone.push(dirpath);
+                    } else if event.mask.contains(EventMask::DELETE) {
+                        mut_paths_clone.retain(|p| p != &dirpath);
+                    }
+                }
+            }
+
+            Ok(())
         }));
 
         Ok(Gallery {
@@ -54,18 +88,37 @@ impl Gallery {
         })
     }
 
+    // Returns a Vector that is a snapshot of the current Gallery.
+    pub fn snapshot(&self) -> GallerySnapshot {
+        GallerySnapshot {
+            paths: self.paths.lock().unwrap().to_vec(),
+        }
+    }
+
     pub fn has(&self, path: &Path) -> bool {
-        self.paths.iter().any(|p| p == path)
+        self.paths.lock().unwrap().iter().any(|p| p == path)
     }
 }
 
 impl Drop for Gallery {
     fn drop(&mut self) {
         self.stop.swap(true, Ordering::Relaxed);
-        self.inotify_thread
+        let res = self
+            .inotify_thread
             .take()
             .expect("invariant: inotify_thread should never be None prior to Drop()")
             .join()
             .expect("failed to join the thread");
+
+        // This is the final result of the thread, if there was any.
+        if res.is_err() {
+            println!("Thread reported error: {:?}", res.err());
+        }
     }
+}
+
+// A snapshot of a Gallery in time, that does not change over time.
+#[derive(Debug, Serialize)]
+pub struct GallerySnapshot {
+    pub paths: Vec<PathBuf>,
 }

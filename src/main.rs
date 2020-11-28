@@ -68,7 +68,7 @@ fn index(gallery: State<gallery::Gallery>) -> Template {
     // That said, I am risk averse enough (and dumb enough) to not trust myself to write that code
     // correctly, so I'll tolerate the slower page load. Perhaps when I use this with enough
     // images, it'll take so damn long that I'll bite the bullet. Right now, I'm not there yet.
-    Template::render("index", gallery.inner())
+    Template::render("index", gallery.inner().snapshot())
 }
 
 fn main() -> Result<()> {
