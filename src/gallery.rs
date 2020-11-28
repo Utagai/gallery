@@ -35,7 +35,11 @@ impl Gallery {
             .flatten()
             .collect::<Result<Vec<DirEntry>, std::io::Error>>()?;
 
-        let path_vec = results.iter().map(|x| x.path()).collect::<Vec<PathBuf>>();
+        let path_vec = results
+            .iter()
+            .map(|x| x.path())
+            .filter(|x| !x.is_dir()) // We do not support nested directories.
+            .collect::<Vec<PathBuf>>();
 
         let stop = Arc::new(AtomicBool::new(false));
         let stop_clone = stop.clone();
@@ -84,10 +88,18 @@ impl Gallery {
                 let mut dirpath = dir.clone();
                 dirpath.push(path);
 
+                if event.mask.contains(EventMask::ISDIR) {
+                    // We don't support nested directory structures.
+                    // We could... but I personally have no use for them.
+                    continue;
+                }
+
                 if event.mask.contains(EventMask::CREATE) {
                     mut_paths.push(dirpath);
                 } else if event.mask.contains(EventMask::DELETE) {
                     mut_paths.retain(|p| p != &dirpath);
+                } else {
+                    panic!("should not have received any inotify events besides CREATE/DELETE")
                 }
             }
         }
