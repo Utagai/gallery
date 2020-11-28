@@ -25,3 +25,28 @@ pub fn parse_config_path_from_args_or_die() -> Result<String> {
 pub struct GalleryConfig {
     pub dirs: Vec<PathBuf>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_json() {
+        let load_res = load_config("./src/testconfigs/invalid_json.json");
+        assert!(load_res.is_err());
+        assert_eq!(
+            load_res.err().unwrap().to_string(),
+            "expected `,` or `]` at line 4 column 1"
+        );
+    }
+
+    #[test]
+    fn nonexistent_config() {
+        let load_res = load_config("./src/testconfigs/i_dont_exist.json");
+        assert!(load_res.is_err());
+        assert_eq!(
+            load_res.err().unwrap().to_string(),
+            "No such file or directory (os error 2)"
+        );
+    }
+}
