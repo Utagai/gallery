@@ -18,8 +18,5 @@ A simple web-app I use to help me do a few things:
 
 ---
 
-There are some important things left to do to make this nicer to use. See the
-Issues.
-
 ### Here's a screenshot of Gallery, running against a subset of my wallpapers:
 ![img](./rsrc/gallery_screenshot.jpg)
