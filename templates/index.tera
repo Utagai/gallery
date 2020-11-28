@@ -5,6 +5,8 @@
       Gallery
     </title>
 
+    <link rel="icon" type="image/png" href="/favicon/favicon.png">
+
     <style>
       div.gallery {
         margin: 5px;

@@ -9,6 +9,7 @@ use anyhow::{anyhow, Context, Error, Result};
 use rocket::http::Status;
 use rocket::response::{self, status::Custom, NamedFile, Responder};
 use rocket::{Request, State};
+use rocket_contrib::serve::{Options, StaticFiles};
 use rocket_contrib::templates::Template;
 
 mod config;
@@ -79,6 +80,13 @@ fn main() -> Result<()> {
         gallery::Gallery::new(&gallery_cfg).context("could not scan image directories")?;
 
     rocket::ignite()
+        .mount(
+            "/favicon",
+            StaticFiles::new(
+                concat!(env!("CARGO_MANIFEST_DIR"), "./rsrc/favicon/"),
+                Options::None,
+            ),
+        )
         .mount("/", routes![index, get_img])
         .attach(Template::fairing())
         .manage(gallery)
