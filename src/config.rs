@@ -3,7 +3,7 @@ use std::fs::File;
 use std::path::PathBuf;
 use std::str;
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Result};
 use serde::Deserialize;
 
 pub fn load_config(config_path: &str) -> Result<GalleryConfig> {
@@ -17,7 +17,7 @@ pub fn parse_config_path_from_args_or_die() -> Result<String> {
     if let Some(first_arg) = env::args().nth(1) {
         Ok(first_arg)
     } else {
-        Err(Error::msg("no configuration file argument specified"))
+        Err(anyhow!("no configuration file argument specified"))
     }
 }
 

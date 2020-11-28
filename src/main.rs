@@ -5,7 +5,7 @@ use std::path::Path;
 #[macro_use]
 extern crate rocket;
 
-use anyhow::{Context, Error, Result};
+use anyhow::{anyhow, Context, Error, Result};
 use rocket::http::Status;
 use rocket::response::{self, status::Custom, NamedFile, Responder};
 use rocket::{Request, State};
@@ -44,7 +44,7 @@ impl<'r> Responder<'r> for GetImgResponder {
 fn get_img(gallery: State<gallery::Gallery>, path: String) -> GetImgResponder {
     let p = Path::new(&path);
     if !gallery.has(p) {
-        return GetImgResponder::err(Error::msg(format!("'{}' is not in the gallery", path)));
+        return GetImgResponder::err(anyhow!("'{}' is not in the gallery", path));
     }
 
     match NamedFile::open(p) {
