@@ -12,6 +12,7 @@ use rocket::{Request, State};
 use rocket_contrib::templates::Template;
 
 mod config;
+mod gallery;
 
 struct GetImgResponder {
     res: Result<NamedFile>,
@@ -40,7 +41,7 @@ impl<'r> Responder<'r> for GetImgResponder {
 }
 
 #[get("/img?<path>")]
-fn get_img(gallery: State<config::Gallery>, path: String) -> GetImgResponder {
+fn get_img(gallery: State<gallery::Gallery>, path: String) -> GetImgResponder {
     let p = Path::new(&path);
     if !gallery.has(p) {
         return GetImgResponder::err(Error::msg(format!("'{}' is not in the gallery", path)));
@@ -53,7 +54,7 @@ fn get_img(gallery: State<config::Gallery>, path: String) -> GetImgResponder {
 }
 
 #[get("/")]
-fn index(gallery: State<config::Gallery>) -> Template {
+fn index(gallery: State<gallery::Gallery>) -> Template {
     // TODO: This is not as performant as encoding an API endpoint that returns the image bytes.
     // Doing the API endpoint method lets us get natural parallelism, as the browser will fire off
     // a request for each image individually, whereas, currently, we are serially writing the bytes
@@ -74,7 +75,8 @@ fn main() -> Result<()> {
         config::parse_config_path_from_args_or_die().context("failed to open the config file")?;
     let gallery_cfg = config::load_config(&config_filepath).context("failed to parse config")?;
 
-    let gallery = config::Gallery::new(&gallery_cfg).context("could not scan image directories")?;
+    let gallery =
+        gallery::Gallery::new(&gallery_cfg).context("could not scan image directories")?;
 
     rocket::ignite()
         .mount("/", routes![index, get_img])
