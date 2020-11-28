@@ -57,6 +57,11 @@ impl Gallery {
         })
     }
 
+    // The amount of time the Gallery will wait before it checks for filesystem changes again.
+    pub fn periodicity() -> std::time::Duration {
+        std::time::Duration::from_millis(200)
+    }
+
     fn reactor(
         dirs: Vec<PathBuf>,
         paths: Arc<Mutex<Vec<PathBuf>>>,
@@ -73,7 +78,7 @@ impl Gallery {
 
         let mut buffer = [0u8; 4096];
         while !stop.load(Ordering::Relaxed) {
-            let events = inotify.read_events_blocking(&mut buffer)?;
+            let events = inotify.read_events(&mut buffer)?;
             let mut mut_paths = paths.lock().unwrap();
             for event in events {
                 let file_name = match event.name {
@@ -102,6 +107,9 @@ impl Gallery {
                     panic!("should not have received any inotify events besides CREATE/DELETE")
                 }
             }
+
+            // Don't hammer the CPU.
+            thread::sleep(Gallery::periodicity());
         }
 
         Ok(())

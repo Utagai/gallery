@@ -8,7 +8,7 @@ extern crate rocket;
 use anyhow::{anyhow, Context, Error, Result};
 use rocket::http::Status;
 use rocket::response::{self, status::Custom, NamedFile, Responder};
-use rocket::{Request, State};
+use rocket::{Request, Rocket, State};
 use rocket_contrib::serve::{Options, StaticFiles};
 use rocket_contrib::templates::Template;
 
@@ -71,14 +71,7 @@ fn index(gallery: State<gallery::Gallery>) -> Template {
     Template::render("index", gallery.inner().snapshot())
 }
 
-fn main() -> Result<()> {
-    let config_filepath =
-        config::parse_config_path_from_args_or_die().context("failed to open the config file")?;
-    let gallery_cfg = config::load_config(&config_filepath).context("failed to parse config")?;
-
-    let gallery =
-        gallery::Gallery::new(&gallery_cfg).context("could not scan image directories")?;
-
+fn rocket(gallery: gallery::Gallery) -> Rocket {
     rocket::ignite()
         .mount(
             "/favicon",
@@ -90,7 +83,112 @@ fn main() -> Result<()> {
         .mount("/", routes![index, get_img])
         .attach(Template::fairing())
         .manage(gallery)
-        .launch();
+}
+
+fn main() -> Result<()> {
+    let config_filepath =
+        config::parse_config_path_from_args_or_die().context("failed to open the config file")?;
+    let gallery_cfg = config::load_config(&config_filepath).context("failed to parse config")?;
+
+    let gallery =
+        gallery::Gallery::new(&gallery_cfg).context("could not scan image directories")?;
+
+    rocket(gallery).launch();
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use pretty_assertions::assert_eq;
+    use rocket::http::Status;
+    use rocket::local::Client;
+    use scraper::{Html, Selector};
+    use std::fs;
+
+    fn gallery() -> gallery::Gallery {
+        let gallery_cfg = config::load_config("./src/testconfigs/rocket_tests.json")
+            .expect("failed to load the rocket tests configuration");
+        gallery::Gallery::new(&gallery_cfg).expect("could not create the Gallery")
+    }
+
+    fn get_num_imgs_rendered(mut response: rocket::local::LocalResponse) -> usize {
+        let html_text = response
+            .body_string()
+            .expect("did not get any response body");
+        let document = Html::parse_document(&html_text);
+        let selector = Selector::parse("div.gallery").expect("failed to parse image selector");
+        document.select(&selector).count()
+    }
+
+    #[test]
+    fn index_page_has_right_num_of_imgs() {
+        let gallery = gallery();
+        let client = Client::new(rocket(gallery)).expect("valid rocket instance");
+        let response = client.get("/").dispatch();
+        assert_eq!(response.status(), Status::Ok);
+
+        // There are 2 images under the directory configured in the test config.
+        assert_eq!(get_num_imgs_rendered(response), 2);
+    }
+
+    #[test]
+    fn returned_image_is_correct() {
+        let gallery = gallery();
+        let client = Client::new(rocket(gallery)).expect("valid rocket instance");
+        let img_path = "./src/testdata/2.png";
+        let mut response = client.get(format!("/img?path={}", img_path)).dispatch();
+        assert_eq!(response.status(), Status::Ok);
+
+        let actual_bytes = response
+            .body_bytes()
+            .expect("did not get any response body bytes");
+        let expected_bytes = fs::read(img_path).expect("failed to read image from disk");
+        let zipper = actual_bytes.iter().zip(expected_bytes.iter());
+        // We avoid assert_eq!() because it is tremendously slow, even for smaller images.
+        // This may be a fault of pretty_assertions and not standard library assert_eq. I am not
+        // sure.
+        for (actual, expected) in zipper {
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn file_not_in_gallery_is_rejected() {
+        let gallery = gallery();
+        let client = Client::new(rocket(gallery)).expect("valid rocket instance");
+        let img_path = "/home/oblivious_bob/.ssh/id_rsa";
+        let response = client.get(format!("/img?path={}", img_path)).dispatch();
+        assert_eq!(response.status(), Status::BadRequest);
+    }
+
+    #[test]
+    fn added_and_removed_images_are_detected() {
+        let gallery = gallery();
+        let client = Client::new(rocket(gallery)).expect("valid rocket instance");
+        let response = client.get("/").dispatch();
+        assert_eq!(response.status(), Status::Ok);
+        // There are 2 images under the directory configured in the test config.
+        assert_eq!(get_num_imgs_rendered(response), 2);
+
+        // Now cp a pre-existing file into the tracked directory, and expect 3 images.
+        let img_path = "./src/testdata/2.png";
+        let bytes_to_copy = fs::read(img_path).expect("failed to read image from disk");
+        let new_file_path = "./src/testdata/3.png";
+        fs::write(new_file_path, bytes_to_copy).expect("failed to copy over bytes");
+
+        // This is a bit flaky, but, since the Gallery does not instantly learn about filesystem
+        // changes, we need to give it some time to notice the change.
+        // We multiply the periodicity by 2 to get a very generous amount of padding.
+        std::thread::sleep(gallery::Gallery::periodicity() * 2);
+        assert_eq!(get_num_imgs_rendered(client.get("/").dispatch()), 3);
+
+        // Now, delete that new file and expect a return to 2 images.
+        fs::remove_file(new_file_path).expect("failed to remove the copied file");
+        // Ditto comment above about the other sleep.
+        std::thread::sleep(gallery::Gallery::periodicity() * 2);
+        assert_eq!(get_num_imgs_rendered(client.get("/").dispatch()), 2);
+    }
 }
