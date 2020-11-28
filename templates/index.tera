@@ -25,13 +25,13 @@
     </style>
   </head>
   <body>
-    {% for image in images %}
+    {% for path in paths %}
       <div class="gallery">
-        <a target="_blank" href="./img?path={{ image.path }}">
+        <a target="_blank" href="./img?path={{ path }}">
           <!-- For some reason, image/jpeg works for PNGs too. Haven't tested it
           with other image types because I personally don't need them to work but
           it's worth keeping this comment here just in case... -->
-          <img src="./img?path={{ image.path }}"/ height=400>
+          <img src="./img?path={{ path }}"/ height=400>
         </a>
       </div>
     {% endfor %}

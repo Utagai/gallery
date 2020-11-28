@@ -27,25 +27,8 @@ pub struct GalleryConfig {
 }
 
 #[derive(Serialize, Debug)]
-pub struct Image {
-    path: PathBuf,
-    bytes: String,
-}
-
-impl Image {
-    fn new(path: PathBuf) -> Result<Image> {
-        let image_bytes = std::fs::read(&path)?;
-
-        Ok(Image {
-            path,
-            bytes: base64::encode(image_bytes),
-        })
-    }
-}
-
-#[derive(Serialize, Debug)]
 pub struct Gallery {
-    pub images: Vec<Image>,
+    pub paths: Vec<PathBuf>,
 }
 
 impl Gallery {
@@ -64,16 +47,11 @@ impl Gallery {
             .collect::<Result<Vec<DirEntry>, std::io::Error>>()?;
 
         let paths = results.iter().map(|x| x.path()).collect::<Vec<PathBuf>>();
-        let mut images: Vec<Image> = Vec::with_capacity(paths.len());
-        // TODO: We should be able to parallelize this if need be.
-        for path in paths {
-            images.push(Image::new(path)?)
-        }
 
-        Ok(Gallery { images })
+        Ok(Gallery { paths })
     }
 
     pub fn has(&self, path: &Path) -> bool {
-        self.images.iter().any(|i| i.path == path)
+        self.paths.iter().any(|p| p == path)
     }
 }
