@@ -119,7 +119,7 @@ mod test {
             .body_string()
             .expect("did not get any response body");
         let document = Html::parse_document(&html_text);
-        let selector = Selector::parse("div.gallery").expect("failed to parse image selector");
+        let selector = Selector::parse("div.image").expect("failed to parse image selector");
         document.select(&selector).count()
     }
 

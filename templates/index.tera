@@ -8,7 +8,7 @@
     <link rel="icon" type="image/png" href="/favicon/favicon.png">
 
     <style>
-      div.gallery {
+      div.image {
         margin: 5px;
         border: 1px solid #ccc;
         float: left;
@@ -16,11 +16,11 @@
         height: 141px;
       }
 
-      div.gallery:hover {
+      div.image:hover {
         border: 1px solid #777;
       }
 
-      div.gallery img {
+      div.image img {
         width: 100%;
         height: 100%;
       }
@@ -28,7 +28,7 @@
   </head>
   <body>
     {% for path in paths %}
-      <div class="gallery">
+      <div class="image">
         <a target="_blank" href="./img?path={{ path }}">
           <!-- For some reason, image/jpeg works for PNGs too. Haven't tested it
           with other image types because I personally don't need them to work but
