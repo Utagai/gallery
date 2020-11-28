@@ -43,42 +43,7 @@ impl Gallery {
         let paths = Arc::new(Mutex::new(path_vec));
         let paths_clone = paths.clone();
         let inotify_thread = Some(thread::spawn(move || -> Result<()> {
-            // This is a serious enough problem that I'd rather panic.
-            let mut inotify = Inotify::init().expect("failed to initialize inotify");
-
-            let mut watches = HashMap::new();
-            for dir in dirs_clone {
-                let watch =
-                    inotify.add_watch(dir.as_path(), WatchMask::CREATE | WatchMask::DELETE)?;
-                watches.insert(watch, dir.clone());
-            }
-
-            let mut buffer = [0u8; 4096];
-            while !stop_clone.load(Ordering::Relaxed) {
-                let events = inotify.read_events_blocking(&mut buffer)?;
-                let mut mut_paths_clone = paths_clone.lock().unwrap();
-                for event in events {
-                    let file_name = match event.name {
-                        Some(name) => name,
-                        // This should likely never happen, as this is only true if the affected
-                        // file is the watched directory/file itself. In either case, it calls for
-                        // a skip.
-                        None => continue,
-                    };
-                    let path = PathBuf::from(file_name);
-                    let dir = &watches[&event.wd];
-                    let mut dirpath = PathBuf::from(dir);
-                    dirpath.push(path);
-
-                    if event.mask.contains(EventMask::CREATE) {
-                        mut_paths_clone.push(dirpath);
-                    } else if event.mask.contains(EventMask::DELETE) {
-                        mut_paths_clone.retain(|p| p != &dirpath);
-                    }
-                }
-            }
-
-            Ok(())
+            Gallery::reactor(dirs_clone, paths_clone, stop_clone)
         }));
 
         Ok(Gallery {
@@ -86,6 +51,48 @@ impl Gallery {
             stop,
             inotify_thread,
         })
+    }
+
+    fn reactor(
+        dirs: Vec<PathBuf>,
+        paths: Arc<Mutex<Vec<PathBuf>>>,
+        stop: Arc<AtomicBool>,
+    ) -> Result<()> {
+        // This is a serious enough problem that I'd rather panic.
+        let mut inotify = Inotify::init().expect("failed to initialize inotify");
+
+        let mut watches = HashMap::new();
+        for dir in dirs {
+            let watch = inotify.add_watch(dir.as_path(), WatchMask::CREATE | WatchMask::DELETE)?;
+            watches.insert(watch, dir.clone());
+        }
+
+        let mut buffer = [0u8; 4096];
+        while !stop.load(Ordering::Relaxed) {
+            let events = inotify.read_events_blocking(&mut buffer)?;
+            let mut mut_paths = paths.lock().unwrap();
+            for event in events {
+                let file_name = match event.name {
+                    Some(name) => name,
+                    // This should likely never happen, as this is only true if the affected
+                    // file is the watched directory/file itself. In either case, it calls for
+                    // a skip.
+                    None => continue,
+                };
+                let path = PathBuf::from(file_name);
+                let dir = &watches[&event.wd];
+                let mut dirpath = dir.clone();
+                dirpath.push(path);
+
+                if event.mask.contains(EventMask::CREATE) {
+                    mut_paths.push(dirpath);
+                } else if event.mask.contains(EventMask::DELETE) {
+                    mut_paths.retain(|p| p != &dirpath);
+                }
+            }
+        }
+
+        Ok(())
     }
 
     // Returns a Vector that is a snapshot of the current Gallery.
