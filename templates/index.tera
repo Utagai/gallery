@@ -1,41 +1,114 @@
-<!doctype html>
+<!DOCTYPE html>
+<!-- Got this from W3's guide on responsive image grids -->
 <html>
-  <head>
-    <title>
-      Gallery
-    </title>
+<style>
+* {
+  box-sizing: border-box;
+}
 
-    <link rel="icon" type="image/png" href="/favicon/favicon.png">
+body {
+  margin: 0;
+  font-family: Arial;
+  background: #222222;
+}
 
-    <style>
-      div.image {
-        margin: 5px;
-        border: 1px solid #ccc;
-        float: left;
-        width: 250px;
-        height: 141px;
-      }
+.row {
+  display: -ms-flexbox;
+  display: flex;
+  -ms-flex-wrap: wrap;
+  flex-wrap: wrap;
+  padding: 0 4px;
+}
 
-      div.image:hover {
-        border: 1px solid #777;
-      }
+/* Create four equal columns that sits next to each other */
+.column {
+  -ms-flex: 25%;
+  flex: 25%;
+  max-width: 25%;
+  padding: 0 4px;
+}
 
-      div.image img {
-        width: 100%;
-        height: 100%;
-      }
-    </style>
-  </head>
-  <body>
+.column img {
+  margin-top: 8px;
+  vertical-align: middle;
+  width: 100%;
+}
+
+img {
+  border: 2px solid #333333;
+}
+
+img:hover {
+  border: 3px solid #cccccc;
+}
+
+/* Responsive layout - makes a two column-layout instead of four columns */
+@media screen and (max-width: 800px) {
+  .column {
+    -ms-flex: 50%;
+    flex: 50%;
+    max-width: 50%;
+  }
+}
+
+/* Responsive layout - makes the two columns stack on top of each other instead of next to each other */
+@media screen and (max-width: 600px) {
+  .column {
+    -ms-flex: 100%;
+    flex: 100%;
+    max-width: 100%;
+  }
+}
+</style>
+<body>
+
+{% set_global num_columns = 4 %}
+
+<div class="row">
+  <div class="column">
     {% for path in paths %}
+      {% if loop.index0 % num_columns == 0 %}
       <div class="image">
-        <a target="_blank" href="./img?path={{ path }}">
-          <!-- For some reason, image/jpeg works for PNGs too. Haven't tested it
-          with other image types because I personally don't need them to work but
-          it's worth keeping this comment here just in case... -->
-          <img src="./img?path={{ path }}"/ height=400>
+        <a href="./img?path={{ path }}">
+          <img src="./img?path={{ path }}">
         </a>
       </div>
+      {% endif %}
     {% endfor %}
-  </body>
+  </div>
+  <div class="column">
+    {% for path in paths %}
+      {% if loop.index0 % num_columns == 1 %}
+      <div class="image">
+        <a href="./img?path={{ path }}">
+          <img src="./img?path={{ path }}">
+        </a>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <div class="column">
+    {% for path in paths %}
+      {% if loop.index0 % num_columns == 2 %}
+      <div class="image">
+        <a href="./img?path={{ path }}">
+          <img src="./img?path={{ path }}">
+        </a>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <div class="column">
+    {% for path in paths %}
+      {% if loop.index0 % num_columns == 3 %}
+      <div class="image">
+        <a href="./img?path={{ path }}">
+          <img src="./img?path={{ path }}">
+        </a>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+</body>
 </html>
