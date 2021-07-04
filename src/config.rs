@@ -2,9 +2,11 @@ use std::env;
 use std::fs::File;
 use std::path::PathBuf;
 use std::str;
+use std::fmt;
 
 use anyhow::{anyhow, Result};
 use serde::Deserialize;
+use rocket::config::LoggingLevel;
 
 pub fn load_config(config_path: &str) -> Result<GalleryConfig> {
     let config_file = File::open(config_path)?;
@@ -26,10 +28,42 @@ pub struct GalleryConfig {
     pub dirs: Vec<PathBuf>,
     #[serde(default = "default_port")]
     pub port: u16,
+    #[serde(default = "default_logging_level")]
+    pub logging_level: SerializableLoggingLevel,
+}
+
+impl GalleryConfig {
+    pub fn get_rocket_logging_level(&self) -> LoggingLevel {
+        let log_level = &self.logging_level;
+        return log_level.into();
+    }
 }
 
 fn default_port() -> u16 {
     8000
+}
+
+#[derive(Deserialize, Debug)]
+pub enum SerializableLoggingLevel {
+    Debug,
+    Normal,
+    Critical,
+    Off
+}
+
+impl Into<LoggingLevel> for &SerializableLoggingLevel {
+    fn into(self) -> LoggingLevel {
+        match self {
+            SerializableLoggingLevel::Debug => LoggingLevel::Debug,
+            SerializableLoggingLevel::Normal => LoggingLevel::Normal,
+            SerializableLoggingLevel::Critical => LoggingLevel::Critical,
+            SerializableLoggingLevel::Off => LoggingLevel::Off,
+        }
+    }
+}
+
+fn default_logging_level() -> SerializableLoggingLevel {
+    SerializableLoggingLevel::Normal
 }
 
 #[cfg(test)]

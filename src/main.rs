@@ -71,8 +71,8 @@ fn index(gallery: State<gallery::Gallery>) -> Template {
     Template::render("index", gallery.inner().snapshot())
 }
 
-fn rocket(gallery: gallery::Gallery, port: u16) -> Rocket {
-    rocket::custom(Config::build(Environment::Production).port(port).unwrap())
+fn rocket(gallery: gallery::Gallery, cfg: Config) -> Rocket {
+    rocket::custom(cfg)
         .mount(
             "/favicon",
             StaticFiles::new(
@@ -93,7 +93,12 @@ fn main() -> Result<()> {
     let gallery =
         gallery::Gallery::new(&gallery_cfg).context("could not scan image directories")?;
 
-    rocket(gallery, gallery_cfg.port).launch();
+    let rocket_cfg = Config::build(Environment::Production).
+        port(gallery_cfg.port).
+        log_level(gallery_cfg.get_rocket_logging_level()).
+        unwrap();
+
+    rocket(gallery, rocket_cfg).launch();
 
     Ok(())
 }
@@ -105,8 +110,14 @@ mod test {
     use pretty_assertions::assert_eq;
     use rocket::http::Status;
     use rocket::local::Client;
+    use rocket::config::LoggingLevel;
     use scraper::{Html, Selector};
     use std::fs;
+
+    // We don't actually _need_ to have a separate port for these tests, since we are using
+    // rocket::local::Client which is not networked, but whatever.
+    static TEST_ROCKET_PORT: u16 = 8002;
+    static TEST_ROCKET_LOG_LEVEL: LoggingLevel = LoggingLevel::Debug;
 
     fn gallery() -> gallery::Gallery {
         let gallery_cfg = config::load_config("./src/testconfigs/rocket_tests.json")
@@ -126,7 +137,11 @@ mod test {
     #[test]
     fn index_page_has_right_num_of_imgs() {
         let gallery = gallery();
-        let client = Client::new(rocket(gallery, 8000)).expect("valid rocket instance");
+        let rocket_cfg = Config::build(Environment::Production).
+            port(TEST_ROCKET_PORT).
+            log_level(TEST_ROCKET_LOG_LEVEL).
+            unwrap();
+        let client = Client::new(rocket(gallery, rocket_cfg)).expect("valid rocket instance");
         let response = client.get("/").dispatch();
         assert_eq!(response.status(), Status::Ok);
 
@@ -137,7 +152,11 @@ mod test {
     #[test]
     fn returned_image_is_correct() {
         let gallery = gallery();
-        let client = Client::new(rocket(gallery, 8000)).expect("valid rocket instance");
+        let rocket_cfg = Config::build(Environment::Production).
+            port(TEST_ROCKET_PORT).
+            log_level(TEST_ROCKET_LOG_LEVEL).
+            unwrap();
+        let client = Client::new(rocket(gallery, rocket_cfg)).expect("valid rocket instance");
         let img_path = "./src/testdata/2.png";
         let mut response = client.get(format!("/img?path={}", img_path)).dispatch();
         assert_eq!(response.status(), Status::Ok);
@@ -158,7 +177,11 @@ mod test {
     #[test]
     fn file_not_in_gallery_is_rejected() {
         let gallery = gallery();
-        let client = Client::new(rocket(gallery, 8000)).expect("valid rocket instance");
+        let rocket_cfg = Config::build(Environment::Production).
+            port(TEST_ROCKET_PORT).
+            log_level(TEST_ROCKET_LOG_LEVEL).
+            unwrap();
+        let client = Client::new(rocket(gallery, rocket_cfg)).expect("valid rocket instance");
         let img_path = "/home/oblivious_bob/.ssh/id_rsa";
         let response = client.get(format!("/img?path={}", img_path)).dispatch();
         assert_eq!(response.status(), Status::BadRequest);
@@ -167,7 +190,11 @@ mod test {
     #[test]
     fn added_and_removed_images_are_detected() {
         let gallery = gallery();
-        let client = Client::new(rocket(gallery, 8000)).expect("valid rocket instance");
+        let rocket_cfg = Config::build(Environment::Production).
+            port(TEST_ROCKET_PORT).
+            log_level(TEST_ROCKET_LOG_LEVEL).
+            unwrap();
+        let client = Client::new(rocket(gallery, rocket_cfg)).expect("valid rocket instance");
         let response = client.get("/").dispatch();
         assert_eq!(response.status(), Status::Ok);
         // There are 2 images under the directory configured in the test config.

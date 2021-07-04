@@ -1,5 +1,7 @@
 {
   "dirs": [
     "./rsrc/pics"
-  ]
+  ],
+  "port": 8001,
+  "logging_level": "Debug"
 }
