@@ -2,7 +2,6 @@ use std::env;
 use std::fs::File;
 use std::path::PathBuf;
 use std::str;
-use std::fmt;
 
 use anyhow::{anyhow, Result};
 use serde::Deserialize;

@@ -146,6 +146,8 @@ mod test {
         assert_eq!(response.status(), Status::Ok);
 
         // There are 2 images under the directory configured in the test config.
+        // Note that there is also another image in a nested directory, but it is not picked up
+        // because we ignore nested images. Therefore, this test also confirms that behavior.
         assert_eq!(get_num_imgs_rendered(response), 2);
     }
 
