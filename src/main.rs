@@ -8,7 +8,7 @@ extern crate rocket;
 use anyhow::{anyhow, Context, Error, Result};
 use rocket::http::Status;
 use rocket::response::{self, status::Custom, NamedFile, Responder};
-use rocket::{Request, Rocket, State};
+use rocket::{Config, config::Environment, Request, Rocket, State};
 use rocket_contrib::serve::{Options, StaticFiles};
 use rocket_contrib::templates::Template;
 
@@ -71,8 +71,8 @@ fn index(gallery: State<gallery::Gallery>) -> Template {
     Template::render("index", gallery.inner().snapshot())
 }
 
-fn rocket(gallery: gallery::Gallery) -> Rocket {
-    rocket::ignite()
+fn rocket(gallery: gallery::Gallery, port: u16) -> Rocket {
+    rocket::custom(Config::build(Environment::Production).port(port).unwrap())
         .mount(
             "/favicon",
             StaticFiles::new(
@@ -93,7 +93,7 @@ fn main() -> Result<()> {
     let gallery =
         gallery::Gallery::new(&gallery_cfg).context("could not scan image directories")?;
 
-    rocket(gallery).launch();
+    rocket(gallery, gallery_cfg.port).launch();
 
     Ok(())
 }
@@ -126,7 +126,7 @@ mod test {
     #[test]
     fn index_page_has_right_num_of_imgs() {
         let gallery = gallery();
-        let client = Client::new(rocket(gallery)).expect("valid rocket instance");
+        let client = Client::new(rocket(gallery, 8000)).expect("valid rocket instance");
         let response = client.get("/").dispatch();
         assert_eq!(response.status(), Status::Ok);
 
@@ -137,7 +137,7 @@ mod test {
     #[test]
     fn returned_image_is_correct() {
         let gallery = gallery();
-        let client = Client::new(rocket(gallery)).expect("valid rocket instance");
+        let client = Client::new(rocket(gallery, 8000)).expect("valid rocket instance");
         let img_path = "./src/testdata/2.png";
         let mut response = client.get(format!("/img?path={}", img_path)).dispatch();
         assert_eq!(response.status(), Status::Ok);
@@ -158,7 +158,7 @@ mod test {
     #[test]
     fn file_not_in_gallery_is_rejected() {
         let gallery = gallery();
-        let client = Client::new(rocket(gallery)).expect("valid rocket instance");
+        let client = Client::new(rocket(gallery, 8000)).expect("valid rocket instance");
         let img_path = "/home/oblivious_bob/.ssh/id_rsa";
         let response = client.get(format!("/img?path={}", img_path)).dispatch();
         assert_eq!(response.status(), Status::BadRequest);
@@ -167,7 +167,7 @@ mod test {
     #[test]
     fn added_and_removed_images_are_detected() {
         let gallery = gallery();
-        let client = Client::new(rocket(gallery)).expect("valid rocket instance");
+        let client = Client::new(rocket(gallery, 8000)).expect("valid rocket instance");
         let response = client.get("/").dispatch();
         assert_eq!(response.status(), Status::Ok);
         // There are 2 images under the directory configured in the test config.

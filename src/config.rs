@@ -24,6 +24,12 @@ pub fn parse_config_path_from_args_or_die() -> Result<String> {
 #[derive(Deserialize, Debug)]
 pub struct GalleryConfig {
     pub dirs: Vec<PathBuf>,
+    #[serde(default = "default_port")]
+    pub port: u16,
+}
+
+fn default_port() -> u16 {
+    8000
 }
 
 #[cfg(test)]
