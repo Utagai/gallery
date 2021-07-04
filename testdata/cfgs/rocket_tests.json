@@ -1,0 +1,6 @@
+{
+  "dirs": [
+    "./testdata/pics/"
+  ],
+  "port": 8002
+}

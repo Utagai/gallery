@@ -120,7 +120,7 @@ mod test {
     static TEST_ROCKET_LOG_LEVEL: LoggingLevel = LoggingLevel::Debug;
 
     fn gallery() -> gallery::Gallery {
-        let gallery_cfg = config::load_config("./src/testconfigs/rocket_tests.json")
+        let gallery_cfg = config::load_config("./testdata/cfgs/rocket_tests.json")
             .expect("failed to load the rocket tests configuration");
         gallery::Gallery::new(&gallery_cfg).expect("could not create the Gallery")
     }
@@ -157,7 +157,7 @@ mod test {
             log_level(TEST_ROCKET_LOG_LEVEL).
             unwrap();
         let client = Client::new(rocket(gallery, rocket_cfg)).expect("valid rocket instance");
-        let img_path = "./src/testdata/2.png";
+        let img_path = "./testdata/pics/2.png";
         let mut response = client.get(format!("/img?path={}", img_path)).dispatch();
         assert_eq!(response.status(), Status::Ok);
 
@@ -166,9 +166,6 @@ mod test {
             .expect("did not get any response body bytes");
         let expected_bytes = fs::read(img_path).expect("failed to read image from disk");
         let zipper = actual_bytes.iter().zip(expected_bytes.iter());
-        // We avoid assert_eq!() because it is tremendously slow, even for smaller images.
-        // This may be a fault of pretty_assertions and not standard library assert_eq. I am not
-        // sure.
         for (actual, expected) in zipper {
             assert_eq!(actual, expected);
         }
@@ -201,9 +198,9 @@ mod test {
         assert_eq!(get_num_imgs_rendered(response), 2);
 
         // Now cp a pre-existing file into the tracked directory, and expect 3 images.
-        let img_path = "./src/testdata/2.png";
+        let img_path = "./testdata/pics/2.png";
         let bytes_to_copy = fs::read(img_path).expect("failed to read image from disk");
-        let new_file_path = "./src/testdata/3.png";
+        let new_file_path = "./testdata/pics/3.png";
         fs::write(new_file_path, bytes_to_copy).expect("failed to copy over bytes");
 
         // This is a bit flaky, but, since the Gallery does not instantly learn about filesystem

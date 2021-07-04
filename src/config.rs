@@ -72,7 +72,7 @@ mod tests {
 
     #[test]
     fn invalid_json() {
-        let load_res = load_config("./src/testconfigs/invalid_json.json");
+        let load_res = load_config("./testdata/cfgs/invalid_json.json");
         assert!(load_res.is_err());
         assert_eq!(
             load_res.err().unwrap().to_string(),
