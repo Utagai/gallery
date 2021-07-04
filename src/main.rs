@@ -5,12 +5,15 @@ use std::path::Path;
 #[macro_use]
 extern crate rocket;
 
+#[macro_use]
+extern crate rocket_include_static_resources;
+
 use anyhow::{anyhow, Context, Error, Result};
 use rocket::http::Status;
 use rocket::response::{self, status::Custom, NamedFile, Responder};
 use rocket::{Config, config::Environment, Request, Rocket, State};
-use rocket_contrib::serve::{Options, StaticFiles};
 use rocket_contrib::templates::Template;
+use rocket_include_static_resources::StaticResponse;
 
 mod config;
 mod gallery;
@@ -71,16 +74,26 @@ fn index(gallery: State<gallery::Gallery>) -> Template {
     Template::render("index", gallery.inner().snapshot())
 }
 
+#[get("/favicon.ico")]
+fn favicon() -> StaticResponse {
+    static_response!("favicon")
+}
+
+#[get("/favicon-16.png")]
+fn favicon_png() -> StaticResponse {
+    static_response!("favicon-png")
+}
+
 fn rocket(gallery: gallery::Gallery, cfg: Config) -> Rocket {
     rocket::custom(cfg)
-        .mount(
-            "/favicon",
-            StaticFiles::new(
-                concat!(env!("CARGO_MANIFEST_DIR"), "./rsrc/favicon/"),
-                Options::None,
-            ),
-        )
-        .mount("/", routes![index, get_img])
+        .attach(StaticResponse::fairing(|resources| {
+            static_resources_initialize!(
+                resources,
+                "favicon", "./rsrc/favicon/favicon.ico",
+                "favicon-png", "./rsrc/favicon/favicon.png",
+            );
+        }))
+        .mount("/", routes![index, get_img, favicon, favicon_png])
         .attach(Template::fairing())
         .manage(gallery)
 }
