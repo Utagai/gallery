@@ -1,6 +1,7 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 
 use std::path::Path;
+use std::fs::File;
 
 #[macro_use]
 extern crate rocket;
@@ -8,53 +9,34 @@ extern crate rocket;
 #[macro_use]
 extern crate rocket_include_static_resources;
 
-use anyhow::{anyhow, Context, Error, Result};
-use rocket::http::Status;
-use rocket::response::{self, status::Custom, NamedFile, Responder};
-use rocket::{Config, config::Environment, Request, Rocket, State};
+use anyhow::{Context, Result};
+use rocket::response::Stream;
+use rocket::{Config, config::Environment, Rocket, State};
 use rocket_contrib::templates::Template;
 use rocket_include_static_resources::StaticResponse;
 
 mod config;
 mod gallery;
 
-struct GetImgResponder {
-    res: Result<NamedFile>,
-}
-
-impl GetImgResponder {
-    fn ok(res: NamedFile) -> GetImgResponder {
-        GetImgResponder { res: Ok(res) }
-    }
-
-    fn err(err: Error) -> GetImgResponder {
-        GetImgResponder { res: Err(err) }
-    }
-}
-
-impl<'r> Responder<'r> for GetImgResponder {
-    fn respond_to(self, req: &Request) -> response::Result<'r> {
-        match self.res {
-            Ok(named_file) => named_file.respond_to(req),
-            Err(err) => {
-                let resp = Custom(Status::BadRequest, format!("{}", err));
-                resp.respond_to(req)
-            }
-        }
-    }
-}
-
 #[get("/img?<path>")]
-fn get_img(gallery: State<gallery::Gallery>, path: String) -> GetImgResponder {
+fn get_img(gallery: State<gallery::Gallery>, path: String) -> Option<Stream<File>> {
     let p = Path::new(&path);
     if !gallery.has(p) {
-        return GetImgResponder::err(anyhow!("'{}' is not in the gallery", path));
+        return None;
     }
 
-    match NamedFile::open(p) {
-        Ok(named_file) => GetImgResponder::ok(named_file),
-        Err(err) => GetImgResponder::err(Error::new(err)),
+    File::open(p).map(|file| Stream::from(file)).ok()
+}
+
+#[get("/thumbnail?<path>")]
+fn get_thumbnail(gallery: State<gallery::Gallery>, path: String) -> Option<Stream<File>> {
+    let p = Path::new(&path);
+    if !gallery.has(p) {
+        return None;
     }
+
+    let thumbnail_path = gallery.get_thumbnail_path(p);
+    File::open(thumbnail_path).map(|file| Stream::from(file)).ok()
 }
 
 #[get("/")]
@@ -93,7 +75,7 @@ fn rocket(gallery: gallery::Gallery, cfg: Config) -> Rocket {
                 "favicon-png", "./rsrc/favicon/favicon.png",
             );
         }))
-        .mount("/", routes![index, get_img, favicon, favicon_png])
+        .mount("/", routes![index, get_thumbnail, get_img, favicon, favicon_png])
         .attach(Template::fairing())
         .manage(gallery)
 }
@@ -196,7 +178,9 @@ mod test {
         let client = Client::new(rocket(gallery, rocket_cfg)).expect("valid rocket instance");
         let img_path = "/home/oblivious_bob/.ssh/id_rsa";
         let response = client.get(format!("/img?path={}", img_path)).dispatch();
-        assert_eq!(response.status(), Status::BadRequest);
+        assert_eq!(response.status(), Status::NotFound);
+        let response = client.get(format!("/thumbnail?path={}", img_path)).dispatch();
+        assert_eq!(response.status(), Status::NotFound);
     }
 
     #[test]

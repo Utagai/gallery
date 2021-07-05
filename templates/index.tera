@@ -70,7 +70,7 @@ img:hover {
       {% if loop.index0 % num_columns == 0 %}
       <div class="image">
         <a href="./img?path={{ path }}">
-          <img src="./img?path={{ path }}">
+          <img src="./thumbnail?path={{ path }}">
         </a>
       </div>
       {% endif %}
@@ -81,7 +81,7 @@ img:hover {
       {% if loop.index0 % num_columns == 1 %}
       <div class="image">
         <a href="./img?path={{ path }}">
-          <img src="./img?path={{ path }}">
+          <img src="./thumbnail?path={{ path }}">
         </a>
       </div>
       {% endif %}
@@ -92,7 +92,7 @@ img:hover {
       {% if loop.index0 % num_columns == 2 %}
       <div class="image">
         <a href="./img?path={{ path }}">
-          <img src="./img?path={{ path }}">
+          <img src="./thumbnail?path={{ path }}">
         </a>
       </div>
       {% endif %}
@@ -103,7 +103,7 @@ img:hover {
       {% if loop.index0 % num_columns == 3 %}
       <div class="image">
         <a href="./img?path={{ path }}">
-          <img src="./img?path={{ path }}">
+          <img src="./thumbnail?path={{ path }}">
         </a>
       </div>
       {% endif %}

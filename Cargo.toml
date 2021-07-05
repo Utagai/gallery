@@ -15,6 +15,8 @@ serde_json = "1.0.59"
 anyhow = "1.0.34"
 base64 = "0.13.0"
 inotify = "0.9.1"
+image = "0.23.14"
+dirs = "3.0.2"
 
 [dependencies.rocket_contrib]
 version = "0.4.10"

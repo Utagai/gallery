@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fs::{read_dir, DirEntry, ReadDir};
+use std::fs::{create_dir_all, read_dir, DirEntry, ReadDir};
 use std::path::{Path, PathBuf};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -7,7 +7,9 @@ use std::sync::{
 };
 use std::thread::{self, JoinHandle};
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
+use dirs;
+use image::io::Reader as ImageReader;
 use inotify::{EventMask, Inotify, WatchMask};
 use serde::Serialize;
 
@@ -16,9 +18,28 @@ use crate::config;
 #[derive(Debug)]
 pub struct Gallery {
     pub paths: Arc<Mutex<Vec<PathBuf>>>,
+    cache_dir: PathBuf,
     stop: Arc<AtomicBool>,
     inotify_thread: Option<JoinHandle<Result<()>>>,
 }
+
+static GALLERY_CACHE_DIR_NAME: &'static str = "gallery";
+static THUMBNAIL_FORMAT: image::ImageFormat = image::ImageFormat::Jpeg;
+// static THUMBNAIL_FORMAT_EXT: &'static str =
+fn thumbnail_format_ext() -> &'static str {
+    THUMBNAIL_FORMAT
+        .extensions_str()
+        .first()
+        // This should never panic really... I think hehe.
+        .expect(
+            "expected there to be at least one extension string for the chosen thumbnail format",
+        )
+}
+// Maintain a 16:9 aspect ratio.
+// Note that since we are using .thumbnail(), the `image` crate will preserve the aspect ratio of
+// the original image anyways, so this isn't really a big deal.
+static THUMBNAIL_WIDTH: u32 = 16 * 20;
+static THUMBNAIL_HEIGHT: u32 = 9 * 20;
 
 impl Gallery {
     pub fn new(cfg: &config::GalleryConfig) -> Result<Gallery> {
@@ -35,31 +56,69 @@ impl Gallery {
             .flatten()
             .collect::<Result<Vec<DirEntry>, std::io::Error>>()?;
 
-        let path_vec = results
+        let paths_vec = results
             .iter()
             .map(|x| x.path())
             .filter(|x| !x.is_dir()) // We do not support nested directories.
             .collect::<Vec<PathBuf>>();
 
-        let stop = Arc::new(AtomicBool::new(false));
-        let stop_clone = stop.clone();
-        let dirs_clone = cfg.dirs.to_vec();
-        let paths = Arc::new(Mutex::new(path_vec));
-        let paths_clone = paths.clone();
-        let inotify_thread = Some(thread::spawn(move || -> Result<()> {
-            Gallery::reactor(dirs_clone, paths_clone, stop_clone)
-        }));
+        if let Some(cache_dir) = dirs::cache_dir() {
+            let gallery_cache_dir = cache_dir.join(GALLERY_CACHE_DIR_NAME);
+            // Now that we found the cache dir, let's make a gallery subdir:
+            create_dir_all(&gallery_cache_dir)?;
+            Gallery::make_thumbnails(&gallery_cache_dir, &paths_vec)?;
 
-        Ok(Gallery {
-            paths,
-            stop,
-            inotify_thread,
-        })
+            let stop = Arc::new(AtomicBool::new(false));
+            let stop_clone = stop.clone();
+            let dirs_clone = cfg.dirs.to_vec();
+            let paths = Arc::new(Mutex::new(paths_vec));
+            let paths_clone = paths.clone();
+            let inotify_thread = Some(thread::spawn(move || -> Result<()> {
+                Gallery::reactor(dirs_clone, paths_clone, stop_clone)
+            }));
+
+            Ok(Gallery {
+                paths,
+                cache_dir: gallery_cache_dir,
+                stop,
+                inotify_thread,
+            })
+        } else {
+            bail!("failed to find the cache dir");
+        }
+    }
+
+    fn make_thumbnails(gallery_cache_dir: &PathBuf, paths: &Vec<PathBuf>) -> Result<()> {
+        for path in paths {
+            let pathref = &path;
+            if let Some(img_filename) = path.file_name() {
+                let mut thumbnail_path = gallery_cache_dir.join(img_filename);
+                // Unfortunately, we need to explicitly set the extension here because the
+                // image crate does not support saving files of every single format that
+                // gallery could potentially return.
+                if !thumbnail_path.set_extension(thumbnail_format_ext()) {
+                    bail!(
+                        "failed to set the thumbnail path '{}' to be .{}",
+                        // Blissfully assume this conversion will always work.
+                        thumbnail_path.to_str().unwrap(),
+                        thumbnail_format_ext(),
+                    );
+                }
+                if thumbnail_path.exists() {
+                    // Don't waste time creating this thumbnail if it exists already.
+                    continue;
+                }
+                let img = ImageReader::open(pathref)?.decode()?;
+                let thumbnail = img.thumbnail(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
+                thumbnail.save_with_format(thumbnail_path, image::ImageFormat::Png)?;
+            }
+        }
+        return Ok(());
     }
 
     // The amount of time the Gallery will wait before it checks for filesystem changes again.
     pub fn periodicity() -> std::time::Duration {
-        std::time::Duration::from_millis(200)
+        std::time::Duration::from_millis(1000)
     }
 
     fn reactor(
@@ -109,6 +168,7 @@ impl Gallery {
             }
 
             // Don't hammer the CPU.
+            drop(mut_paths);
             thread::sleep(Gallery::periodicity());
         }
 
@@ -125,6 +185,12 @@ impl Gallery {
     pub fn has(&self, path: &Path) -> bool {
         self.paths.lock().unwrap().iter().any(|p| p == path)
     }
+
+    pub fn get_thumbnail_path(&self, path: &Path) -> PathBuf {
+        let mut path_copy = path.to_path_buf();
+        path_copy.set_extension(thumbnail_format_ext());
+        self.cache_dir.join(path_copy.file_name().unwrap())
+    }
 }
 
 impl Drop for Gallery {
@@ -138,6 +204,7 @@ impl Drop for Gallery {
             .expect("failed to join the thread");
 
         // This is the final result of the thread, if there was any.
+        // Nothing we can do if this happens, so just print something out.
         if res.is_err() {
             println!("Thread reported error: {:?}", res.err());
         }
