@@ -73,8 +73,9 @@ impl Gallery {
             let dirs_clone = cfg.dirs.to_vec();
             let paths = Arc::new(Mutex::new(paths_vec));
             let paths_clone = paths.clone();
+            let gallery_cache_dir_copy = gallery_cache_dir.clone();
             let inotify_thread = Some(thread::spawn(move || -> Result<()> {
-                Gallery::reactor(dirs_clone, paths_clone, stop_clone)
+                Gallery::reactor(dirs_clone, paths_clone, &gallery_cache_dir_copy, stop_clone)
             }));
 
             Ok(Gallery {
@@ -124,6 +125,7 @@ impl Gallery {
     fn reactor(
         dirs: Vec<PathBuf>,
         paths: Arc<Mutex<Vec<PathBuf>>>,
+        cache_dir: &PathBuf,
         stop: Arc<AtomicBool>,
     ) -> Result<()> {
         // This is a serious enough problem that I'd rather panic.
@@ -165,6 +167,8 @@ impl Gallery {
                 } else {
                     panic!("should not have received any inotify events besides CREATE/DELETE")
                 }
+
+                Gallery::make_thumbnails(cache_dir, &mut_paths)?;
             }
 
             // Don't hammer the CPU.

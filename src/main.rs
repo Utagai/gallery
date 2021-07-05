@@ -186,6 +186,9 @@ mod test {
     #[test]
     fn added_and_removed_images_are_detected() {
         let gallery = gallery();
+        // Compute these now before we move gallery into `rocket()`.
+        let new_file_path = "./testdata/pics/3.png";
+        let thumbnail_path = gallery.get_thumbnail_path(Path::new(&new_file_path));
         let rocket_cfg = Config::build(Environment::Production).
             port(TEST_ROCKET_PORT).
             log_level(TEST_ROCKET_LOG_LEVEL).
@@ -199,7 +202,6 @@ mod test {
         // Now cp a pre-existing file into the tracked directory, and expect 3 images.
         let img_path = "./testdata/pics/2.png";
         let bytes_to_copy = fs::read(img_path).expect("failed to read image from disk");
-        let new_file_path = "./testdata/pics/3.png";
         fs::write(new_file_path, bytes_to_copy).expect("failed to copy over bytes");
 
         // This is a bit flaky, but, since the Gallery does not instantly learn about filesystem
@@ -207,9 +209,12 @@ mod test {
         // We multiply the periodicity by 2 to get a very generous amount of padding.
         std::thread::sleep(gallery::Gallery::periodicity() * 2);
         assert_eq!(get_num_imgs_rendered(client.get("/").dispatch()), 3);
+        // And check that a thumbnail has been created:
+        assert!(thumbnail_path.exists());
 
         // Now, delete that new file and expect a return to 2 images.
         fs::remove_file(new_file_path).expect("failed to remove the copied file");
+        fs::remove_file(thumbnail_path).expect("failed to remove the thumbnail file");
         // Ditto comment above about the other sleep.
         std::thread::sleep(gallery::Gallery::periodicity() * 2);
         assert_eq!(get_num_imgs_rendered(client.get("/").dispatch()), 2);
