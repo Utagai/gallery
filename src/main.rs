@@ -1,7 +1,7 @@
 #![feature(proc_macro_hygiene, decl_macro)]
 
-use std::path::Path;
 use std::fs::File;
+use std::path::Path;
 
 #[macro_use]
 extern crate rocket;
@@ -11,7 +11,7 @@ extern crate rocket_include_static_resources;
 
 use anyhow::{Context, Result};
 use rocket::response::Stream;
-use rocket::{Config, config::Environment, Rocket, State};
+use rocket::{config::Environment, Config, Rocket, State};
 use rocket_contrib::templates::Template;
 use rocket_include_static_resources::StaticResponse;
 
@@ -36,7 +36,9 @@ fn get_thumbnail(gallery: State<gallery::Gallery>, path: String) -> Option<Strea
     }
 
     let thumbnail_path = gallery.get_thumbnail_path(p);
-    File::open(thumbnail_path).map(|file| Stream::from(file)).ok()
+    File::open(thumbnail_path)
+        .map(|file| Stream::from(file))
+        .ok()
 }
 
 #[get("/")]
@@ -71,11 +73,16 @@ fn rocket(gallery: gallery::Gallery, cfg: Config) -> Rocket {
         .attach(StaticResponse::fairing(|resources| {
             static_resources_initialize!(
                 resources,
-                "favicon", "./rsrc/favicon/favicon.ico",
-                "favicon-png", "./rsrc/favicon/favicon.png",
+                "favicon",
+                "./rsrc/favicon/favicon.ico",
+                "favicon-png",
+                "./rsrc/favicon/favicon.png",
             );
         }))
-        .mount("/", routes![index, get_thumbnail, get_img, favicon, favicon_png])
+        .mount(
+            "/",
+            routes![index, get_thumbnail, get_img, favicon, favicon_png],
+        )
         .attach(Template::fairing())
         .manage(gallery)
 }
@@ -88,10 +95,10 @@ fn main() -> Result<()> {
     let gallery =
         gallery::Gallery::new(&gallery_cfg).context("could not scan image directories")?;
 
-    let rocket_cfg = Config::build(Environment::Production).
-        port(gallery_cfg.port).
-        log_level(gallery_cfg.get_rocket_logging_level()).
-        unwrap();
+    let rocket_cfg = Config::build(Environment::Production)
+        .port(gallery_cfg.port)
+        .log_level(gallery_cfg.get_rocket_logging_level())
+        .unwrap();
 
     rocket(gallery, rocket_cfg).launch();
 
@@ -103,9 +110,9 @@ mod test {
     use super::*;
 
     use pretty_assertions::assert_eq;
+    use rocket::config::LoggingLevel;
     use rocket::http::Status;
     use rocket::local::Client;
-    use rocket::config::LoggingLevel;
     use scraper::{Html, Selector};
     use std::fs;
 
@@ -132,10 +139,10 @@ mod test {
     #[test]
     fn index_page_has_right_num_of_imgs() {
         let gallery = gallery();
-        let rocket_cfg = Config::build(Environment::Production).
-            port(TEST_ROCKET_PORT).
-            log_level(TEST_ROCKET_LOG_LEVEL).
-            unwrap();
+        let rocket_cfg = Config::build(Environment::Production)
+            .port(TEST_ROCKET_PORT)
+            .log_level(TEST_ROCKET_LOG_LEVEL)
+            .unwrap();
         let client = Client::new(rocket(gallery, rocket_cfg)).expect("valid rocket instance");
         let response = client.get("/").dispatch();
         assert_eq!(response.status(), Status::Ok);
@@ -149,10 +156,10 @@ mod test {
     #[test]
     fn returned_image_is_correct() {
         let gallery = gallery();
-        let rocket_cfg = Config::build(Environment::Production).
-            port(TEST_ROCKET_PORT).
-            log_level(TEST_ROCKET_LOG_LEVEL).
-            unwrap();
+        let rocket_cfg = Config::build(Environment::Production)
+            .port(TEST_ROCKET_PORT)
+            .log_level(TEST_ROCKET_LOG_LEVEL)
+            .unwrap();
         let client = Client::new(rocket(gallery, rocket_cfg)).expect("valid rocket instance");
         let img_path = "./testdata/pics/2.png";
         let mut response = client.get(format!("/img?path={}", img_path)).dispatch();
@@ -171,15 +178,17 @@ mod test {
     #[test]
     fn file_not_in_gallery_is_rejected() {
         let gallery = gallery();
-        let rocket_cfg = Config::build(Environment::Production).
-            port(TEST_ROCKET_PORT).
-            log_level(TEST_ROCKET_LOG_LEVEL).
-            unwrap();
+        let rocket_cfg = Config::build(Environment::Production)
+            .port(TEST_ROCKET_PORT)
+            .log_level(TEST_ROCKET_LOG_LEVEL)
+            .unwrap();
         let client = Client::new(rocket(gallery, rocket_cfg)).expect("valid rocket instance");
         let img_path = "/home/oblivious_bob/.ssh/id_rsa";
         let response = client.get(format!("/img?path={}", img_path)).dispatch();
         assert_eq!(response.status(), Status::NotFound);
-        let response = client.get(format!("/thumbnail?path={}", img_path)).dispatch();
+        let response = client
+            .get(format!("/thumbnail?path={}", img_path))
+            .dispatch();
         assert_eq!(response.status(), Status::NotFound);
     }
 
@@ -189,10 +198,10 @@ mod test {
         // Compute these now before we move gallery into `rocket()`.
         let new_file_path = "./testdata/pics/3.png";
         let thumbnail_path = gallery.get_thumbnail_path(Path::new(&new_file_path));
-        let rocket_cfg = Config::build(Environment::Production).
-            port(TEST_ROCKET_PORT).
-            log_level(TEST_ROCKET_LOG_LEVEL).
-            unwrap();
+        let rocket_cfg = Config::build(Environment::Production)
+            .port(TEST_ROCKET_PORT)
+            .log_level(TEST_ROCKET_LOG_LEVEL)
+            .unwrap();
         let client = Client::new(rocket(gallery, rocket_cfg)).expect("valid rocket instance");
         let response = client.get("/").dispatch();
         assert_eq!(response.status(), Status::Ok);

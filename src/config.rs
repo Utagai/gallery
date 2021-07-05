@@ -4,8 +4,8 @@ use std::path::PathBuf;
 use std::str;
 
 use anyhow::{anyhow, Result};
-use serde::Deserialize;
 use rocket::config::LoggingLevel;
+use serde::Deserialize;
 
 pub fn load_config(config_path: &str) -> Result<GalleryConfig> {
     let config_file = File::open(config_path)?;
@@ -47,7 +47,7 @@ pub enum SerializableLoggingLevel {
     Debug,
     Normal,
     Critical,
-    Off
+    Off,
 }
 
 impl Into<LoggingLevel> for &SerializableLoggingLevel {

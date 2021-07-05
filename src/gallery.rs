@@ -114,7 +114,7 @@ impl Gallery {
                     thumbnail.save_with_format(thumbnail_path, image::ImageFormat::Png)?;
                 } else {
                     // If it isn't an image, just ignore it.
-                    continue
+                    continue;
                 }
             }
         }
