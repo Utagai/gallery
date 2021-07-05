@@ -109,9 +109,13 @@ impl Gallery {
                     // Don't waste time creating this thumbnail if it exists already.
                     continue;
                 }
-                let img = ImageReader::open(pathref)?.decode()?;
-                let thumbnail = img.thumbnail(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
-                thumbnail.save_with_format(thumbnail_path, image::ImageFormat::Png)?;
+                if let Ok(img) = ImageReader::open(pathref)?.decode() {
+                    let thumbnail = img.thumbnail(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
+                    thumbnail.save_with_format(thumbnail_path, image::ImageFormat::Png)?;
+                } else {
+                    // If it isn't an image, just ignore it.
+                    continue
+                }
             }
         }
         return Ok(());
